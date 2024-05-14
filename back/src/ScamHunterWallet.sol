@@ -5,21 +5,18 @@ import "../node_modules/@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "../node_modules/@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "../node_modules/@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import "../node_modules/@openzeppelin/contracts/utils/Address.sol";
-import "../node_modules/@chainlink/contracts/src/v0.8/Chainlink.sol";
+import "../node_modules/@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "../node_modules/@chainlink/contracts/src/v0.8/ChainlinkClient.sol";
 
-contract ScamHunterWallet is Chainlink {
+contract ScamHunterWallet is ChainlinkClient, ReentrancyGuard {
     using Address for address;
 
     mapping(address => bool) public authorizedSigners;
 
-    // Adresse de l'oracle Chainlink
     address public oracle;
-
-    // Adresse du contrat Chainlink pour l'API OpenAI
     address public openAIOracleContract;
-
-    // Clé d'API pour l'API OpenAI
     string public openAIApiKey;
+    uint256 public ORACLE_PAYMENT;
 
     modifier onlyAuthorized() {
         require(authorizedSigners[msg.sender], "Not authorized");
@@ -29,11 +26,16 @@ contract ScamHunterWallet is Chainlink {
     constructor(
         address _oracle,
         address _openAIOracleContract,
-        string memory _openAIApiKey
+        string memory _openAIApiKey,
+        uint256 _oraclePayment
     ) {
         oracle = _oracle;
         openAIOracleContract = _openAIOracleContract;
         openAIApiKey = _openAIApiKey;
+        ORACLE_PAYMENT = _oraclePayment;
+
+        // Set Chainlink token
+        setPublicChainlinkToken();
     }
 
     function authorize(address _signer) external {
@@ -46,17 +48,14 @@ contract ScamHunterWallet is Chainlink {
         authorizedSigners[_signer] = false;
     }
 
-    // Fonction pour déposer des tokens ERC20 dans le portefeuille
     function depositERC20(address _token, uint256 _amount) external {
         IERC20(_token).transferFrom(msg.sender, address(this), _amount);
     }
 
-    // Fonction pour déposer des tokens ERC721 dans le portefeuille
     function depositERC721(address _token, uint256 _tokenId) external {
         IERC721(_token).transferFrom(msg.sender, address(this), _tokenId);
     }
 
-    // Fonction pour déposer des tokens ERC1155 dans le portefeuille
     function depositERC1155(
         address _token,
         uint256 _id,
@@ -72,13 +71,12 @@ contract ScamHunterWallet is Chainlink {
         );
     }
 
-    // Fonction pour retirer des tokens ERC20 du portefeuille
     function withdrawERC20(
         address _token,
         address _to,
         uint256 _amount,
         bytes calldata _signature
-    ) external onlyAuthorized {
+    ) external onlyAuthorized nonReentrant {
         require(
             verifySignature(msg.sender, _to, _amount, _signature),
             "Invalid signature"
@@ -86,13 +84,12 @@ contract ScamHunterWallet is Chainlink {
         IERC20(_token).transfer(_to, _amount);
     }
 
-    // Fonction pour retirer des tokens ERC721 du portefeuille
     function withdrawERC721(
         address _token,
         address _to,
         uint256 _tokenId,
         bytes calldata _signature
-    ) external onlyAuthorized {
+    ) external onlyAuthorized nonReentrant {
         require(
             verifySignature(msg.sender, _to, _tokenId, _signature),
             "Invalid signature"
@@ -100,7 +97,6 @@ contract ScamHunterWallet is Chainlink {
         IERC721(_token).transferFrom(address(this), _to, _tokenId);
     }
 
-    // Fonction pour retirer des tokens ERC1155 du portefeuille
     function withdrawERC1155(
         address _token,
         address _to,
@@ -108,7 +104,7 @@ contract ScamHunterWallet is Chainlink {
         uint256 _amount,
         bytes memory _data,
         bytes calldata _signature
-    ) external onlyAuthorized {
+    ) external onlyAuthorized nonReentrant {
         require(
             verifySignature(msg.sender, _to, _id, _signature),
             "Invalid signature"
@@ -122,12 +118,10 @@ contract ScamHunterWallet is Chainlink {
         );
     }
 
-    // Fonction pour récupérer le solde d'un token ERC20 dans le portefeuille
     function balanceOfERC20(address _token) external view returns (uint256) {
         return IERC20(_token).balanceOf(address(this));
     }
 
-    // Fonction pour vérifier la possession d'un token ERC721 par le portefeuille
     function balanceOfERC721(
         address _token,
         uint256 _tokenId
@@ -135,33 +129,28 @@ contract ScamHunterWallet is Chainlink {
         return IERC721(_token).ownerOf(_tokenId) == address(this);
     }
 
-    // Fonction pour récupérer le solde d'un token ERC1155 dans le portefeuille
     function balanceOfERC1155(
         address _token,
         uint256 _id
     ) external view returns (uint256) {
-        (uint256 balance, , ) = IERC1155(_token).balanceOf(address(this), _id);
-        return balance;
+        return IERC1155(_token).balanceOf(address(this), _id);
     }
 
-    // Fonction pour vérifier la signature d'une transaction
     function verifySignature(
         address _from,
         address _to,
         uint256 _amount,
         bytes memory _signature
     ) internal view returns (bool) {
-        // Code de vérification de signature
-        // Vérifie que _from a signé la transaction
-        // Retourne true si la signature est valide, sinon false
+        // Signature verification logic here
+        // Returns true if the signature is valid, otherwise false
     }
 
-    // Fonction pour vérifier si un contrat est suspect
     function checkContract(address _contractAddress) external {
         Chainlink.Request memory req = buildChainlinkRequest(
             oracle,
             this.fulfill.selector,
-            this.address,
+            address(this),
             this.fulfill.selector
         );
         string memory apiUrl = string(
@@ -177,15 +166,14 @@ contract ScamHunterWallet is Chainlink {
         sendChainlinkRequestTo(oracle, req, ORACLE_PAYMENT);
     }
 
-    // Fonction de réponse de l'oracle Chainlink
     function fulfill(
         bytes32 _requestId,
         bytes32 _result
     ) public recordChainlinkFulfillment(_requestId) {
         if (_result == "true") {
-            // Le contrat est suspect, avertissement à l'utilisateur
+            // The contract is suspect, warn the user
         } else {
-            // Le contrat est sûr, autoriser la transaction
+            // The contract is safe, allow the transaction
         }
     }
 }
