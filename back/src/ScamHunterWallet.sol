@@ -1,179 +1,119 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.25;
 
-import "../node_modules/@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "../node_modules/@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import "../node_modules/@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
-import "../node_modules/@openzeppelin/contracts/utils/Address.sol";
-import "../node_modules/@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "../node_modules/@chainlink/contracts/src/v0.8/ChainlinkClient.sol";
+// OpenZeppelin
+import {IERC20} from "../node_modules/@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-contract ScamHunterWallet is ChainlinkClient, ReentrancyGuard {
-    using Address for address;
+// Chainlink
+import {FunctionsClient} from "@chainlink/contracts/src/v0.8/functions/v1_0_0/FunctionsClient.sol";
+import {ConfirmedOwner} from "@chainlink/contracts/src/v0.8/shared/access/ConfirmedOwner.sol";
+import {FunctionsRequest} from "@chainlink/contracts/src/v0.8/functions/v1_0_0/libraries/FunctionsRequest.sol";
 
-    mapping(address => bool) public authorizedSigners;
+/**
+ * @title GettingStartedFunctionsConsumer
+ * @notice This is an example contract to show how to make HTTP requests using Chainlink
+ * @dev This contract uses hardcoded values and should not be used in production.
+ */
+contract ScamHunterWallet is FunctionsClient, ConfirmedOwner {
+    using FunctionsRequest for FunctionsRequest.Request;
 
-    address public oracle;
-    address public openAIOracleContract;
-    string public openAIApiKey;
-    uint256 public ORACLE_PAYMENT;
+    // State variables to store the last request ID, response, and error
+    bytes32 public s_lastRequestId;
+    bytes public s_lastResponse;
+    bytes public s_lastError;
 
-    modifier onlyAuthorized() {
-        require(authorizedSigners[msg.sender], "Not authorized");
-        _;
-    }
+    // Custom error type
+    error UnexpectedRequestID(bytes32 requestId);
 
-    constructor(
-        address _oracle,
-        address _openAIOracleContract,
-        string memory _openAIApiKey,
-        uint256 _oraclePayment
-    ) {
-        oracle = _oracle;
-        openAIOracleContract = _openAIOracleContract;
-        openAIApiKey = _openAIApiKey;
-        ORACLE_PAYMENT = _oraclePayment;
+    // Event to log responses
+    event Response(
+        bytes32 indexed requestId,
+        string character,
+        bytes response,
+        bytes err
+    );
 
-        // Set Chainlink token
-        setPublicChainlinkToken();
-    }
+    // Router address - Hardcoded for Sepolia
+    // Check to get the router address for your supported network https://docs.chain.link/chainlink-functions/supported-networks
+    address router = 0xb83E47C2bC239B3bf370bc41e1459A34b41238D0;
 
-    function authorize(address _signer) external {
-        require(!_signer.isContract(), "Signer address cannot be a contract");
-        authorizedSigners[_signer] = true;
-    }
+    // JavaScript source code
+    // Fetch AISecurityAnalysename from the Star Wars API.
+    // Documentation: https://swapi.info/people
+    string source =
+        "const characterId = args[0];"
+        "const apiResponse = await Functions.makeHttpRequest({"
+        "url: `https://swapi.info/api/people/${characterId}/`"
+        "});"
+        "if (apiResponse.error) {"
+        "throw Error('Request failed');"
+        "}"
+        "const { data } = apiResponse;"
+        "return Functions.encodeString(data);";
 
-    function revokeAuthorization(address _signer) external {
-        require(authorizedSigners[_signer], "Signer not authorized");
-        authorizedSigners[_signer] = false;
-    }
+    //Callback gas limit
+    uint32 gasLimit = 300000;
 
-    function depositERC20(address _token, uint256 _amount) external {
-        IERC20(_token).transferFrom(msg.sender, address(this), _amount);
-    }
+    // donID - Hardcoded for Sepolia
+    // Check to get the donID for your supported network https://docs.chain.link/chainlink-functions/supported-networks
+    bytes32 donID =
+        0x66756e2d657468657265756d2d7365706f6c69612d3100000000000000000000;
 
-    function depositERC721(address _token, uint256 _tokenId) external {
-        IERC721(_token).transferFrom(msg.sender, address(this), _tokenId);
-    }
+    // State variable to store the returned AISecurityAnalyseinformation
+    string public aIVulnerabilityAnalysisResult;
 
-    function depositERC1155(
-        address _token,
-        uint256 _id,
-        uint256 _amount,
-        bytes memory _data
-    ) external {
-        IERC1155(_token).safeTransferFrom(
-            msg.sender,
-            address(this),
-            _id,
-            _amount,
-            _data
+    /**
+     * @notice Initializes the contract with the Chainlink router address and sets the contract owner
+     */
+    constructor() FunctionsClient(router) ConfirmedOwner(msg.sender) {}
+
+    /**
+     * @notice Sends an HTTP request for AI Vulnerability Analysis
+     * @param subscriptionId The ID for the Chainlink subscription
+     * @param args The arguments to pass to the HTTP request
+     * @return requestId The ID of the request
+     */
+    function sendRequest(
+        uint64 subscriptionId,
+        string[] calldata args
+    ) external onlyOwner returns (bytes32 requestId) {
+        FunctionsRequest.Request memory req;
+        req.initializeRequestForInlineJavaScript(source); // Initialize the request with JS code
+        if (args.length > 0) req.setArgs(args); // Set the arguments for the request
+
+        // Send the request and store the request ID
+        s_lastRequestId = _sendRequest(
+            req.encodeCBOR(),
+            subscriptionId,
+            gasLimit,
+            donID
         );
+
+        return s_lastRequestId;
     }
 
-    function withdrawERC20(
-        address _token,
-        address _to,
-        uint256 _amount,
-        bytes calldata _signature
-    ) external onlyAuthorized nonReentrant {
-        require(
-            verifySignature(msg.sender, _to, _amount, _signature),
-            "Invalid signature"
-        );
-        IERC20(_token).transfer(_to, _amount);
-    }
-
-    function withdrawERC721(
-        address _token,
-        address _to,
-        uint256 _tokenId,
-        bytes calldata _signature
-    ) external onlyAuthorized nonReentrant {
-        require(
-            verifySignature(msg.sender, _to, _tokenId, _signature),
-            "Invalid signature"
-        );
-        IERC721(_token).transferFrom(address(this), _to, _tokenId);
-    }
-
-    function withdrawERC1155(
-        address _token,
-        address _to,
-        uint256 _id,
-        uint256 _amount,
-        bytes memory _data,
-        bytes calldata _signature
-    ) external onlyAuthorized nonReentrant {
-        require(
-            verifySignature(msg.sender, _to, _id, _signature),
-            "Invalid signature"
-        );
-        IERC1155(_token).safeTransferFrom(
-            address(this),
-            _to,
-            _id,
-            _amount,
-            _data
-        );
-    }
-
-    function balanceOfERC20(address _token) external view returns (uint256) {
-        return IERC20(_token).balanceOf(address(this));
-    }
-
-    function balanceOfERC721(
-        address _token,
-        uint256 _tokenId
-    ) external view returns (bool) {
-        return IERC721(_token).ownerOf(_tokenId) == address(this);
-    }
-
-    function balanceOfERC1155(
-        address _token,
-        uint256 _id
-    ) external view returns (uint256) {
-        return IERC1155(_token).balanceOf(address(this), _id);
-    }
-
-    function verifySignature(
-        address _from,
-        address _to,
-        uint256 _amount,
-        bytes memory _signature
-    ) internal view returns (bool) {
-        // Signature verification logic here
-        // Returns true if the signature is valid, otherwise false
-    }
-
-    function checkContract(address _contractAddress) external {
-        Chainlink.Request memory req = buildChainlinkRequest(
-            oracle,
-            this.fulfill.selector,
-            address(this),
-            this.fulfill.selector
-        );
-        string memory apiUrl = string(
-            abi.encodePacked(
-                "https://api.openai.com/v1/analyze_contract?contract=",
-                _contractAddress
-            )
-        );
-        req.add("get", apiUrl);
-        req.add("path", "result");
-        req.add("copyPath", "scam");
-        req.add("times", "1000000000");
-        sendChainlinkRequestTo(oracle, req, ORACLE_PAYMENT);
-    }
-
-    function fulfill(
-        bytes32 _requestId,
-        bytes32 _result
-    ) public recordChainlinkFulfillment(_requestId) {
-        if (_result == "true") {
-            // The contract is suspect, warn the user
-        } else {
-            // The contract is safe, allow the transaction
+    /**
+     * @notice Callback function for fulfilling a request
+     * @param requestId The ID of the request to fulfill
+     * @param response The HTTP response data
+     * @param err Any errors from the Functions request
+     */
+    function fulfillRequest(
+        bytes32 requestId,
+        bytes memory response,
+        bytes memory err
+    ) internal override {
+        if (s_lastRequestId != requestId) {
+            revert UnexpectedRequestID(requestId); // Check if request IDs match
         }
+        // Update the contract's state variables with the response and any errors
+        s_lastResponse = response;
+        aIVulnerabilityAnalysisResult= string(response);
+        s_lastError = err;
+
+        // Emit an event to log the response
+        emit Response(requestId, character, s_lastResponse, s_lastError);
     }
+}
+
 }
