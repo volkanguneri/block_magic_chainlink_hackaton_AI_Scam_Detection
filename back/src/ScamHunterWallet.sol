@@ -5,9 +5,9 @@ pragma solidity ^0.8.25;
 import {IERC20} from "../node_modules/@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 // Chainlink
-import {FunctionsClient} from "@chainlink/contracts/src/v0.8/functions/v1_0_0/FunctionsClient.sol";
-import {ConfirmedOwner} from "@chainlink/contracts/src/v0.8/shared/access/ConfirmedOwner.sol";
-import {FunctionsRequest} from "@chainlink/contracts/src/v0.8/functions/v1_0_0/libraries/FunctionsRequest.sol";
+import {FunctionsClient} from "../node_modules/@chainlink/contracts/src/v0.8/functions/v1_0_0/FunctionsClient.sol";
+import {ConfirmedOwner} from "../node_modules/@chainlink/contracts/src/v0.8/shared/access/ConfirmedOwner.sol";
+import {FunctionsRequest} from "../node_modules/@chainlink/contracts/src/v0.8/functions/v1_0_0/libraries/FunctionsRequest.sol";
 
 /**
  * @title GettingStartedFunctionsConsumer
@@ -108,12 +108,15 @@ contract ScamHunterWallet is FunctionsClient, ConfirmedOwner {
         }
         // Update the contract's state variables with the response and any errors
         s_lastResponse = response;
-        aIVulnerabilityAnalysisResult= string(response);
+        aIVulnerabilityAnalysisResult = string(response);
         s_lastError = err;
 
         // Emit an event to log the response
-        emit Response(requestId, character, s_lastResponse, s_lastError);
+        emit Response(
+            requestId,
+            aIVulnerabilityAnalysisResult,
+            s_lastResponse,
+            s_lastError
+        );
     }
-}
-
 }
