@@ -1,0 +1,3 @@
+comment récupérer le contrat à analyser pour l'envoyer à chat gpt?
+
+comment intégrer la demande chainlink avant approve(). au travers d'une wallet si oui comment créer la connectique de ce wallet? 
