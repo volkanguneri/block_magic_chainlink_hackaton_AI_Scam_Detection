@@ -38,18 +38,30 @@ contract ScamHunterWallet is FunctionsClient, ConfirmedOwner {
     address router = 0xb83E47C2bC239B3bf370bc41e1459A34b41238D0;
 
     // JavaScript source code
-    // Fetch AISecurityAnalysename from the Star Wars API.
-    // Documentation: https://swapi.info/people
+    // Fetch data from the OpenAI
+    // Documentation:
     string source =
-        "const characterId = args[0];"
-        "const apiResponse = await Functions.makeHttpRequest({"
-        "url: `https://swapi.info/api/people/${characterId}/`"
-        "});"
-        "if (apiResponse.error) {"
-        "throw Error('Request failed');"
-        "}"
-        "const { data } = apiResponse;"
-        "return Functions.encodeString(data);";
+        string(
+            abi.encodePacked(
+                "const axios = require('axios');",
+                "const openaiApiKey = 'YOUR_OPENAI_API_KEY';",
+                "const contractToAnalyze = args[0];",
+                "const response = await axios.post('https://api.openai.com/v1/completions', {",
+                "  model: 'text-davinci-002',",
+                "  prompt: `Analyze this smart contract for potential threats: ${contractToAnalyze}`,",
+                "  max_tokens: 1000",
+                "}, {",
+                "  headers: {",
+                "    'Authorization': `Bearer ${openaiApiKey}`",
+                "  }",
+                "});",
+                "if (response.error) {",
+                "  throw Error('Request failed');",
+                "}",
+                "const analysis = response.data.choices[0].text;",
+                "return Functions.encodeString(analysis);"
+            )
+        );
 
     //Callback gas limit
     uint32 gasLimit = 300000;
@@ -60,7 +72,7 @@ contract ScamHunterWallet is FunctionsClient, ConfirmedOwner {
         0x66756e2d657468657265756d2d7365706f6c69612d3100000000000000000000;
 
     // State variable to store the returned AISecurityAnalyseinformation
-    string public aIVulnerabilityAnalysisResult;
+    string public aiScamReport;
 
     /**
      * @notice Initializes the contract with the Chainlink router address and sets the contract owner
@@ -108,15 +120,10 @@ contract ScamHunterWallet is FunctionsClient, ConfirmedOwner {
         }
         // Update the contract's state variables with the response and any errors
         s_lastResponse = response;
-        aIVulnerabilityAnalysisResult = string(response);
+        aiScamReport = string(response);
         s_lastError = err;
 
         // Emit an event to log the response
-        emit Response(
-            requestId,
-            aIVulnerabilityAnalysisResult,
-            s_lastResponse,
-            s_lastError
-        );
+        emit Response(requestId, aiScamReport, s_lastResponse, s_lastError);
     }
 }
