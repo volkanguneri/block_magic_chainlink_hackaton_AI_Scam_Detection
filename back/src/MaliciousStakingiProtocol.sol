@@ -4,7 +4,7 @@ pragma solidity ^0.8.25;
 import "../node_modules/@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "../node_modules/@openzeppelin/contracts/access/Ownable.sol";
 
-contract MaliciousDeFiProtocol is Ownable {
+contract MaliciousStakingiProtocol is Ownable {
     IERC20 public token;
 
     // Address of the backup wallet (actually the attacker's wallet)

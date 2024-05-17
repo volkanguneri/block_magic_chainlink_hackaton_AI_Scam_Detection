@@ -14,7 +14,7 @@ import {FunctionsRequest} from "../node_modules/@chainlink/contracts/src/v0.8/fu
  * @notice This is an example contract to show how to make HTTP requests using Chainlink
  * @dev This contract uses hardcoded values and should not be used in production.
  */
-contract ScamHunterWallet is FunctionsClient, ConfirmedOwner {
+contract ChainlinkRequestToAI is FunctionsClient, ConfirmedOwner {
     using FunctionsRequest for FunctionsRequest.Request;
 
     // State variables to store the last request ID, response, and error
