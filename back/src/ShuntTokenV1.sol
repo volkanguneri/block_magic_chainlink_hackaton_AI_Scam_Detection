@@ -10,7 +10,7 @@ import {FunctionsClient} from "../node_modules/@chainlink/contracts/src/v0.8/fun
 import {ConfirmedOwner} from "../node_modules/@chainlink/contracts/src/v0.8/shared/access/ConfirmedOwner.sol";
 import {FunctionsRequest} from "../node_modules/@chainlink/contracts/src/v0.8/functions/v1_0_0/libraries/FunctionsRequest.sol";
 
-contract ShuntToken is ERC20, Ownable, FunctionsClient, ConfirmedOwner {
+contract ShuntToken is ERC20, FunctionsClient, ConfirmedOwner {
     using FunctionsRequest for FunctionsRequest.Request;
 
     // DON ID for the Functions DON to which the requests are sent
@@ -80,9 +80,8 @@ contract ShuntToken is ERC20, Ownable, FunctionsClient, ConfirmedOwner {
 
     constructor(
         address _chainlinkAPIRequestRouter,
-        uint32 _donID
+        bytes32 _donID
     )
-        Ownable(msg.sender)
         ERC20("Scam Hunter", "Shunt")
         FunctionsClient(_chainlinkAPIRequestRouter)
         ConfirmedOwner(msg.sender)
