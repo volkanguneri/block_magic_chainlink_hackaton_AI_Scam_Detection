@@ -1,3 +1,6 @@
-comment récupérer le contrat à analyser pour l'envoyer à chat gpt?
+transferFrom function of the shunt token contract is triggered by the staking platform.
 
-comment intégrer la demande chainlink avant approve(). au travers d'une wallet si oui comment créer la connectique de ce wallet? 
+make a chainlink http request to ethersan to see if the contract is verified, 
+
+1. if yes, take the contract and send it to open AI. (Second http request)
+2. Sinon, emit contract non verified so can not be analysed 

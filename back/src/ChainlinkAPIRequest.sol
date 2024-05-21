@@ -14,8 +14,11 @@ import {FunctionsRequest} from "../node_modules/@chainlink/contracts/src/v0.8/fu
  * @notice This is an example contract to show how to make HTTP requests using Chainlink
  * @dev This contract uses hardcoded values and should not be used in production.
  */
-contract ChainlinkRequestToAI is FunctionsClient, ConfirmedOwner {
+contract ChainlinkAPIRequest is FunctionsClient, ConfirmedOwner {
     using FunctionsRequest for FunctionsRequest.Request;
+
+    // DON ID for the Functions DON to which the requests are sent
+    bytes32 public donID;
 
     // State variables to store the last request ID, response, and error
     bytes32 public s_lastRequestId;
@@ -28,48 +31,13 @@ contract ChainlinkRequestToAI is FunctionsClient, ConfirmedOwner {
     // Event to log responses
     event Response(
         bytes32 indexed requestId,
-        string character,
+        string aiScamReport,
         bytes response,
         bytes err
     );
 
-    // Router address - Hardcoded for Sepolia
-    // Check to get the router address for your supported network https://docs.chain.link/chainlink-functions/supported-networks
-    address router = 0xb83E47C2bC239B3bf370bc41e1459A34b41238D0;
-
-    // JavaScript source code
-    // Fetch data from the OpenAI
-    // Documentation:
-    string source =
-        string(
-            abi.encodePacked(
-                "const axios = require('axios');",
-                "const openaiApiKey = 'YOUR_OPENAI_API_KEY';",
-                "const contractToAnalyze = args[0];",
-                "const response = await axios.post('https://api.openai.com/v1/completions', {",
-                "  model: 'text-davinci-002',",
-                "  prompt: `Analyze this smart contract for potential threats: ${contractToAnalyze}`,",
-                "  max_tokens: 1000",
-                "}, {",
-                "  headers: {",
-                "    'Authorization': `Bearer ${openaiApiKey}`",
-                "  }",
-                "});",
-                "if (response.error) {",
-                "  throw Error('Request failed');",
-                "}",
-                "const analysis = response.data.choices[0].text;",
-                "return Functions.encodeString(analysis);"
-            )
-        );
-
     //Callback gas limit
     uint32 gasLimit = 300000;
-
-    // donID - Hardcoded for Sepolia
-    // Check to get the donID for your supported network https://docs.chain.link/chainlink-functions/supported-networks
-    bytes32 donID =
-        0x66756e2d657468657265756d2d7365706f6c69612d3100000000000000000000;
 
     // State variable to store the returned AISecurityAnalyseinformation
     string public aiScamReport;
@@ -77,15 +45,29 @@ contract ChainlinkRequestToAI is FunctionsClient, ConfirmedOwner {
     /**
      * @notice Initializes the contract with the Chainlink router address and sets the contract owner
      */
-    constructor() FunctionsClient(router) ConfirmedOwner(msg.sender) {}
+    constructor(
+        address router,
+        bytes32 _donID
+    ) FunctionsClient(router) ConfirmedOwner(msg.sender) {
+        donID = _donID;
+    }
 
     /**
-     * @notice Sends an HTTP request for AI Vulnerability Analysis
+     * @notice Set the DON ID
+     * @param newDonId New DON ID
+     */
+    function setDonId(bytes32 newDonId) external onlyOwner {
+        donID = newDonId;
+    }
+
+    /**
+     * @notice Sends an HTTP request using any API
      * @param subscriptionId The ID for the Chainlink subscription
      * @param args The arguments to pass to the HTTP request
      * @return requestId The ID of the request
      */
     function sendRequest(
+        string calldata source,
         uint64 subscriptionId,
         string[] calldata args
     ) external onlyOwner returns (bytes32 requestId) {

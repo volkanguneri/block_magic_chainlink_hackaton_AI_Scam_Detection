@@ -6,29 +6,89 @@ import "../node_modules/@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "../node_modules/@openzeppelin/contracts/access/Ownable.sol";
 
 // Importing the Chainlink contract
-import {ChainlinkRequestToAI} from "./ChainlinkRequestToAI.sol";
+import {ChainlinkAPIRequest} from "./ChainlinkAPIRequest.sol";
 
-contract ShuntToken is ERC20, Ownable {
+contract ShuntToken is ERC20, Ownable, ChainlinkAPIRequest {
     // Declaration of a variable to store the instance of the Chainlink contract
-    ChainlinkRequestToAI public chainlinkContract;
+    ChainlinkAPIRequest public chainlinkAPIRequest;
+
+    // JavaScript source code
+    // Fetch data from the Etherscan
+    // Documentation: https://docs.etherscan.io/
+    string sourceEtherscan =
+    string(
+        abi.encodePacked(
+            "const axios = require('axios');",
+            "const etherscanApiKey = 'YOUR_ETHERSCAN_API_KEY';",
+            "const contractAddress = args[0];",
+            "const url = `https://api.etherscan.io/api?module=account&action=txlist&address=${contractAddress}&startblock=0&endblock=99999999&sort=asc&apikey=${etherscanApiKey}`;",
+            "const response = await axios.get(url);",
+            "if (response.data.status === '1') {",
+            "  const txCount = response.data.result.length;",
+            "  return Functions.encodeString(txCount.toString());",
+            "} else {",
+            "  throw Error('Request failed');",
+            "}"
+        )
+    );
+
+    // JavaScript source code
+    // Fetch data from the OpenAI
+    // Documentation:https://platform.openai.com/docs/introduction
+    string sourceOpenAI =
+        string(
+            abi.encodePacked(
+                "const axios = require('axios');",
+                "const openaiApiKey = 'YOUR_OPENAI_API_KEY';",
+                "const contractToAnalyze = args[0];",
+                "const response = await axios.post('https://api.openai.com/v1/completions', {",
+                "  model: 'text-davinci-002',",
+                "  prompt: `Analyze this smart contract for potential threats: ${contractToAnalyze}`,",
+                "  max_tokens: 1000",
+                "}, {",
+                "  headers: {",
+                "    'Authorization': `Bearer ${openaiApiKey}`",
+                "  }",
+                "});",
+                "if (response.error) {",
+                "  throw Error('Request failed');",
+                "}",
+                "const analysis = response.data.choices[0].text;",
+                "return Functions.encodeString(analysis);"
+            )
+        );
 
     constructor(
-        address _chainlinkContractAddr
+        address chainlinkAPIRequestContractAddr
     ) Ownable(msg.sender) ERC20("Scam Hunter", "Shunt") {
         _mint(msg.sender, 1000000 * 10 ** 18);
 
         // Creating an instance of the Chainlink contract with the specified address
-        chainlinkContract = ChainlinkRequestToAI(_chainlinkContractAddr);
+        chainlinkAPIRequest = ChainlinkAPIRequest(_chainlinkAPIRequestContractAddr);
     }
 
-    /**
-     * @dev Sends the bytecode to OpenAI via Chainlink for analysis
-     * @param bytecode The bytecode of the contract to be analyzed
-     */
-    function sendBytecodeToOpenAI(string memory bytecode) public {
-        // Sends the request to the Chainlink oracle for bytecode analysis
-        chainlinkContract.sendRequest(1, [bytecode]); // The first argument is the subscription ID, which is 1 here
+    // Chainlink send request for ethrscan api to get the contract verified or not
+    chainlinkAPIRequest.sendRequest(
+        sourceEtherscan,
+        2701,
+        string[] calldata args
+    ) {
+        FunctionsRequest.Request memory req;
+        req.initializeRequestForInlineJavaScript(source); // Initialize the request with JS code
+        if (args.length > 0) req.setArgs(args); // Set the arguments for the request
+
+        // Send the request and store the request ID
+        s_lastRequestId = _sendRequest(
+            req.encodeCBOR(),
+            subscriptionId,
+            gasLimit,
+            donID
+        );
+
+        return s_lastRequestId;
     }
+
+    //Chainlink send request for open ai analysis
 
     /**
      * @dev Overrides the transferFrom function to include contract analysis logic
@@ -41,45 +101,11 @@ contract ShuntToken is ERC20, Ownable {
         address sender,
         address recipient,
         uint256 amount
-    ) public returns (bool) {
-        bytes memory senderBytecode = new bytes(extcodesize(sender));
-        assembly {
-            extcodecopy(
-                sender,
-                add(senderBytecode, 0x20),
-                0,
-                extcodesize(sender)
-            )
-        }
+    ) public override returns (bool) {
+        //send request ETherscan
+        // if verified, send request open ai
+        // and approve if the user decides to
 
-        // Decompose the bytecode and store it in the variable contractToAnalyse
-        string memory contractToAnalyse = string(
-            abi.encodePacked("Bytecode: ", bytesToString(senderBytecode))
-        );
-
-        // Send the bytecode to OpenAI for analysis via Chainlink
-        sendBytecodeToOpenAI(contractToAnalyse);
-
-        // Continue with the usual transfer logic
         return true;
-    }
-
-    /**
-     * @dev Converts a byte array to a string
-     * @param data The byte array to convert
-     * @return The string representation of the byte array
-     */
-    function bytesToString(
-        bytes memory data
-    ) internal pure returns (string memory) {
-        bytes memory alphabet = "0123456789abcdef";
-        bytes memory str = new bytes(2 + data.length * 2);
-        str[0] = "0";
-        str[1] = "x";
-        for (uint i = 0; i < data.length; i++) {
-            str[2 + i * 2] = alphabet[uint(uint8(data[i] >> 4))];
-            str[3 + i * 2] = alphabet[uint(uint8(data[i] & 0x0f))];
-        }
-        return string(str);
     }
 }
