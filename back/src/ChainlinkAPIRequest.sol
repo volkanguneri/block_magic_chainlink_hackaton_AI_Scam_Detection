@@ -25,6 +25,9 @@ contract ChainlinkAPIRequest is FunctionsClient, ConfirmedOwner {
     bytes public s_lastResponse;
     bytes public s_lastError;
 
+    // State variable to store the returned AISecurityAnalyseinformation
+    string public s_result;
+
     // Custom error type
     error UnexpectedRequestID(bytes32 requestId);
 
@@ -35,12 +38,6 @@ contract ChainlinkAPIRequest is FunctionsClient, ConfirmedOwner {
         bytes response,
         bytes err
     );
-
-    //Callback gas limit
-    uint32 gasLimit = 300000;
-
-    // State variable to store the returned AISecurityAnalyseinformation
-    string public aiScamReport;
 
     /**
      * @notice Initializes the contract with the Chainlink router address and sets the contract owner
@@ -61,7 +58,7 @@ contract ChainlinkAPIRequest is FunctionsClient, ConfirmedOwner {
     }
 
     /**
-     * @notice Sends an HTTP request using any API
+     * @notice Sends an HTTP request using any API with javascript source code defined in ShuntToken.sol
      * @param subscriptionId The ID for the Chainlink subscription
      * @param args The arguments to pass to the HTTP request
      * @return requestId The ID of the request
@@ -69,7 +66,8 @@ contract ChainlinkAPIRequest is FunctionsClient, ConfirmedOwner {
     function sendRequest(
         string calldata source,
         uint64 subscriptionId,
-        string[] calldata args
+        string[] calldata args,
+        uint32 callbackGasLimit
     ) external onlyOwner returns (bytes32 requestId) {
         FunctionsRequest.Request memory req;
         req.initializeRequestForInlineJavaScript(source); // Initialize the request with JS code
@@ -79,7 +77,7 @@ contract ChainlinkAPIRequest is FunctionsClient, ConfirmedOwner {
         s_lastRequestId = _sendRequest(
             req.encodeCBOR(),
             subscriptionId,
-            gasLimit,
+            callbackGasLimit,
             donID
         );
 
@@ -102,10 +100,10 @@ contract ChainlinkAPIRequest is FunctionsClient, ConfirmedOwner {
         }
         // Update the contract's state variables with the response and any errors
         s_lastResponse = response;
-        aiScamReport = string(response);
+        s_result = string(response);
         s_lastError = err;
 
         // Emit an event to log the response
-        emit Response(requestId, aiScamReport, s_lastResponse, s_lastError);
+        emit Response(requestId, s_result, s_lastResponse, s_lastError);
     }
 }
