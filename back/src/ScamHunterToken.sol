@@ -80,7 +80,6 @@ contract ScamHunterToken is ERC20, FunctionsClient, ConfirmedOwner {
             callbackGasLimit,
             donID
         );
-
         return s_lastRequestId;
     }
 
@@ -129,15 +128,25 @@ contract ScamHunterToken is ERC20, FunctionsClient, ConfirmedOwner {
         address recipient,
         uint256 amount
     ) public override returns (bool) {
+        // JS code source example
+        string memory source = "const contractAddress = args[0];"
+        "const apiResponse = await Functions.makeHttpRequest({"
+        "url: `https://api.etherscan.io/api?module=contract&action=getabi&address=${contractAddress}&apikey=${ETHERSCAN_API_KEY}`"
+        "});"
+        "if (apiResponse.error) {"
+        "throw Error('Request failed');"
+        "}"
+        "const { data } = apiResponse;"
+        "return Functions.encodeString(data.result[0].SourceCode);";
+
         // JavaScript source code
         // Fetch data from the Etherscan
         // Documentation: https://docs.etherscan.io/
         string memory sourceEtherscan = string(
             abi.encodePacked(
                 "const axios = require('axios');",
-                "const etherscanApiKey = 'YOUR_ETHERSCAN_API_KEY';",
                 "const contractAddress = args[0];",
-                "const url = `https://api.etherscan.io/api?module=account&action=txlist&address=${contractAddress}&startblock=0&endblock=99999999&sort=asc&apikey=${etherscanApiKey}`;",
+                "const url = `https://api.etherscan.io/api?module=contract&action=getabi&address=${contractAddress}&apikey=${ETHERSCAN_API_KEY}`;",
                 "const response = await axios.get(url);",
                 "if (response.data.status === '1') {",
                 "  const txCount = response.data.result.length;",
@@ -177,7 +186,7 @@ contract ScamHunterToken is ERC20, FunctionsClient, ConfirmedOwner {
         sendRequest(sourceEtherscan, 2701, sender, 300000);
 
         // Si vérifié, envoyez la requête à OpenAI
-        sendRequest(sourceOpenAI, 2701, contract, 300000);
+        sendRequest(sourceOpenAI, 2701, s_result, 300000);
 
         // and approve if the user decides to
 
