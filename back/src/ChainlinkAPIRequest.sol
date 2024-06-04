@@ -19,11 +19,11 @@ contract ChainlinkAPIRequest is FunctionsClient, ConfirmedOwner {
 
     //////////////////////////// [D] ////////////////////////////
 
-    // reports: latestForecast response.
-    string public latestForecast;
+    // reports: latest AI Analysis response.
+    string public latestAiAnalysis;
 
-    // emits: price forecast event.
-    event ForecastedPrice(string latestForecast);
+    // emits: price Analysis event.
+    event AiAnalysis(string latestAiAnalysis);
 
     // emits: OCRResponse event.
     event OCRResponse(bytes32 indexed requestId, bytes result, bytes err);
@@ -116,8 +116,8 @@ contract ChainlinkAPIRequest is FunctionsClient, ConfirmedOwner {
         emit OCRResponse(requestId, response, err);
 
         // converts: latest response to a (human-readable) string.
-        latestForecast = string(abi.encodePacked(response));
-        emit ForecastedPrice(latestForecast);
+        latestAiAnalysis = string(abi.encodePacked(response));
+        emit AiAnalysis(latestAiAnalysis);
 
         //////////////////////////// [D] ////////////////////////////
     }
