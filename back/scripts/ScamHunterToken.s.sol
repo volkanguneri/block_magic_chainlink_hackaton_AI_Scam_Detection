@@ -2,9 +2,9 @@
 pragma solidity >=0.7.0;
 
 import "../lib/forge-std/src/Script.sol";
-import "../src/ScamHunter.sol";
+import "../src/ScamHunterToken.sol";
 
-contract ScamHunterScript is Script {
+contract ScamHunter is Script {
     function run() external {
         uint deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
@@ -14,13 +14,13 @@ contract ScamHunterScript is Script {
         address ROUTER_ADDRESS = 0xb83E47C2bC239B3bf370bc41e1459A34b41238D0; // ETH SEPOLIA
         bytes32 DON_ID = 0x66756e2d657468657265756d2d7365706f6c69612d3100000000000000000000; // ETH SEPOLIA
 
-        ScamHunter ScamHunter = new ScamHunter(
+        ScamHunterToken ScamHunterToken = new ScamHunterToken(
             ROUTER_ADDRESS, // address router,
             DON_ID // bytes32 _donId
         );
 
         // silences warning.
-        ScamHunter;
+        ScamHunterToken;
 
         vm.stopBroadcast();
     }

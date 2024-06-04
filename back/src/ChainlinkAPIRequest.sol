@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.25;
 
-// OpenZeppelin
-import {IERC20} from "../node_modules/@openzeppelin/contracts/token/ERC20/IERC20.sol";
-
 // Chainlink
 import {FunctionsClient} from "../node_modules/@chainlink/contracts/src/v0.8/functions/v1_0_0/FunctionsClient.sol";
 import {ConfirmedOwner} from "../node_modules/@chainlink/contracts/src/v0.8/shared/access/ConfirmedOwner.sol";
@@ -18,35 +15,30 @@ contract ChainlinkAPIRequest is FunctionsClient, ConfirmedOwner {
     using FunctionsRequest for FunctionsRequest.Request;
 
     // DON ID for the Functions DON to which the requests are sent
-    bytes32 public donID;
+    bytes32 public donId;
 
-    // State variables to store the last request ID, response, and error
-    bytes32 public s_lastRequestId;
-    bytes public s_lastResponse;
-    bytes public s_lastError;
+    //////////////////////////// [D] ////////////////////////////
 
-    // State variable to store the returned AISecurityAnalyseinformation
-    string public s_result;
+    // reports: latestForecast response.
+    string public latestForecast;
 
-    // Custom error type
-    error UnexpectedRequestID(bytes32 requestId);
+    // emits: price forecast event.
+    event ForecastedPrice(string latestForecast);
 
-    // Event to log responses
-    event Response(
-        bytes32 indexed requestId,
-        string aiScamReport,
-        bytes response,
-        bytes err
-    );
+    // emits: OCRResponse event.
+    event OCRResponse(bytes32 indexed requestId, bytes result, bytes err);
 
-    /**
-     * @notice Initializes the contract with the Chainlink router address and sets the contract owner
-     */
+    //////////////////////////// [D] ////////////////////////////
+
+    bytes32 public latestRequestId;
+    bytes public latestResponse;
+    bytes public latestError;
+
     constructor(
         address router,
-        bytes32 _donID
+        bytes32 _donId
     ) FunctionsClient(router) ConfirmedOwner(msg.sender) {
-        donID = _donID;
+        donId = _donId;
     }
 
     /**
@@ -54,56 +46,79 @@ contract ChainlinkAPIRequest is FunctionsClient, ConfirmedOwner {
      * @param newDonId New DON ID
      */
     function setDonId(bytes32 newDonId) external onlyOwner {
-        donID = newDonId;
+        donId = newDonId;
     }
 
     /**
-     * @notice Sends an HTTP request using any API with javascript source code defined in ShuntToken.sol
-     * @param subscriptionId The ID for the Chainlink subscription
-     * @param args The arguments to pass to the HTTP request
-     * @return requestId The ID of the request
+     * @notice Triggers an on-demand Functions request using remote encrypted secrets
+     * @param source JavaScript source code
+     * @param secretsLocation Location of secrets (only Location.Remote & Location.DONHosted are supported)
+     * @param encryptedSecretsReference Reference pointing to encrypted secrets
+     * @param args String arguments passed into the source code and accessible via the global variable `args`
+     * @param bytesArgs Bytes arguments passed into the source code and accessible via the global variable `bytesArgs` as hex strings
+     * @param subscriptionId Subscription ID used to pay for request (FunctionsConsumer contract address must first be added to the subscription)
+     * @param callbackGasLimit Maximum amount of gas used to call the inherited `handleOracleFulfillment` method
      */
+
     function sendRequest(
         string calldata source,
-        uint64 subscriptionId,
+        FunctionsRequest.Location secretsLocation,
+        bytes calldata encryptedSecretsReference,
         string[] calldata args,
+        bytes[] calldata bytesArgs,
+        uint64 subscriptionId,
         uint32 callbackGasLimit
-    ) external onlyOwner returns (bytes32 requestId) {
+    ) external onlyOwner {
         FunctionsRequest.Request memory req;
-        req.initializeRequestForInlineJavaScript(source); // Initialize the request with JS code
-        if (args.length > 0) req.setArgs(args); // Set the arguments for the request
-
-        // Send the request and store the request ID
-        s_lastRequestId = _sendRequest(
+        req.initializeRequest(
+            FunctionsRequest.Location.Inline,
+            FunctionsRequest.CodeLanguage.JavaScript,
+            source
+        );
+        req.secretsLocation = secretsLocation;
+        req.encryptedSecretsReference = encryptedSecretsReference;
+        if (args.length > 0) {
+            req.setArgs(args);
+        }
+        if (bytesArgs.length > 0) {
+            req.setBytesArgs(bytesArgs);
+        }
+        latestRequestId = _sendRequest(
             req.encodeCBOR(),
             subscriptionId,
             callbackGasLimit,
-            donID
+            donId
         );
-
-        return s_lastRequestId;
     }
 
     /**
-     * @notice Callback function for fulfilling a request
-     * @param requestId The ID of the request to fulfill
-     * @param response The HTTP response data
-     * @param err Any errors from the Functions request
+     * @notice Store latest result/error
+     * @param requestId The request ID, returned by sendRequest()
+     * @param response Aggregated response from the user code
+     * @param err Aggregated error from the user code or from the execution pipeline
+     * Either response or error parameter will be set, but never both
      */
+
     function fulfillRequest(
         bytes32 requestId,
         bytes memory response,
         bytes memory err
     ) internal override {
-        if (s_lastRequestId != requestId) {
-            revert UnexpectedRequestID(requestId); // Check if request IDs match
-        }
-        // Update the contract's state variables with the response and any errors
-        s_lastResponse = response;
-        s_result = string(response);
-        s_lastError = err;
+        latestResponse = response;
+        latestError = err;
 
-        // Emit an event to log the response
-        emit Response(requestId, s_result, s_lastResponse, s_lastError);
+        //////////////////////////// [D] ////////////////////////////
+
+        // updates: latest request id.
+        latestRequestId = requestId;
+
+        // emits: OCRResponse event.
+        emit OCRResponse(requestId, response, err);
+
+        // converts: latest response to a (human-readable) string.
+        latestForecast = string(abi.encodePacked(response));
+        emit ForecastedPrice(latestForecast);
+
+        //////////////////////////// [D] ////////////////////////////
     }
 }
