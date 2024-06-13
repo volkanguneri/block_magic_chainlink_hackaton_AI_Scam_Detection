@@ -26,12 +26,13 @@ const requestConfig = {
 
   // Optional: define secrets accessed within the source code
   secrets: {
-    openAiAPIKey: process.env.OPENAI_KEY,
+    openAiAPIKey: process.env.OPENAI_API_KEY,
     etherscanAPIKey: process.env.ETHERSCAN_API_KEY,
   },
 
   // Define arguments accessed in the source code via args[index]
-  args: ["bitcoin", "d1", "6", "naive", "30"],
+  // uniswap pool address
+  args: ["0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"],
 
   // Specify the code language (JavaScript only)
   codeLanguage: CodeLanguage.JavaScript,

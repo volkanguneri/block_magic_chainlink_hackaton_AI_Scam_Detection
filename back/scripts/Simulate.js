@@ -1,6 +1,6 @@
 const process = require("process");
 const path = require("path");
-// const fs = require("fs")
+// const fs = require("fs");
 const {
   simulateScript,
   decodeResult,
@@ -25,6 +25,7 @@ const simulate = async () => {
       ).toString()}\n`
     );
   }
+
   if (errorString) {
     console.log(`Error returned by simulated script:\n${errorString}\n`);
   }
